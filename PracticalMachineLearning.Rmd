@@ -1,0 +1,103 @@
+---
+title: "Practical Machine Learning Peer Graded Assignment"
+author: "David Li"
+date: "16 June 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+This paper explores the use of machine learning techniques to predict the outcome of the five barbell lifting techniques based on accelerometer data. Using the training data, we designed an algorithm based on the random forest technique to accurately predict the outcomes. It is concluded the model possesses over 99% in predictive accuracy and 0.17% out of sample error, resulting in all predictions made in the testing dataset to be correct.
+
+## Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+The training data for this project are downloaded from: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are downloaded from: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+It is worth citing Groupware@LES for being generous in allowing their data to be used for this assignment.
+
+##Objective
+The goal of this report is to predict the manner the participants have performed the exercise. The "classe" variable is the outcome which categorically designates how the participants performed the exercise. All other variables are predictor variables. The report will also stipualte how the model was built, conduct cross-validation and expectation of the sample error rate. Finally, we will apply the model on the test set of 20 seperate cases.
+
+## Preparation
+We will need to load the required packages to enable our analysis.
+```{r}
+library(caret)
+library(rpart)
+library(knitr)
+library(randomForest)
+library(ElemStatLearn)
+library(corrplot)
+library(ggplot2)
+set.seed(5849)#For reproducibility purposes
+setwd("C:/Users/david/Desktop/Coursera/Module 8/Peer Graded Assignment/PracticalMachineLearning")
+```
+Now we will load in our training and test sets:
+```{r}
+rawtrainset <- read.csv("./pml-training.csv",header = T, sep = ",",na.strings = c("NA",""))
+rawtestset <- read.csv("./pml-testing.csv",header = T, sep = ",",na.strings = c( "NA",""))
+```
+The next step is to begin separating our dataset as a training and testing set. The dataset will also be cleaned before 
+```{r}
+rawtrainset <- rawtrainset[ ,-1]
+inTrain = createDataPartition(rawtrainset$classe, p=0.60, list = F)
+training = rawtrainset[inTrain,]
+validating = rawtrainset[-inTrain,]
+```
+In terms of the model selection, we will be using the random forest method. The main reason for this is the benefit of prediction accuracy while noting the potential for overfitting and reducing interpretablity.
+
+In building the algorithm, the dataset must be checked on the potential for columns to have missing data. We will set a rule that determines that columns with less than 60% of data are removed.
+
+```{r}
+sum(colSums(!is.na(training[,-ncol(training)])) < 0.6*nrow(training))
+
+```
+Next, we set a criteria to remove columns that do not meet the 60% data threshold before we apply the model.
+```{r}
+Keep <- c((colSums(!is.na(training[,-ncol(training)])) >= 0.6*nrow(training)))
+training   <-  training[,Keep]
+validating <- validating[,Keep]
+```
+
+Since we have selected the random forest methodology, a cross-validation or separate test to attain an unbiased estimate of the test set error is not required. Instead this is estimated during execution of the model.
+
+## Modelling Execution
+
+```{r}
+model <- randomForest(classe~.,data=training)
+model
+```
+
+## Model Evaluation
+The model will be evaluated through the confusion matrix function to get a good sense of the model accuracy.
+```{r}
+confusionMatrix(predict(model,newdata=validating[,-ncol(validating)]),validating$classe)
+```
+As we can see, for this particular model, we obtain a 99.73% accuracy over the validation set. While our out of sample error is 0.17%.
+
+##Model Testing
+Now let's involve the testing dataset to test the predictive capacity of our model. We will need to conduct some cleaning on the testing dataset such that they are coerced for the same class as the training dataset.
+
+```{r}
+rawtestset <- rawtestset[,-1] # Remove ID column which si the first column
+rawtestset <- rawtestset[ , Keep] # Keep the same columns of testing dataset
+rawtestset <- rawtestset[,-ncol(rawtestset)] # Remove the problem ID
+testing <- rbind(training[100, -59] , rawtestset)  # Coerce testing dataset to the same structure as training dataset
+row.names(testing) <- c(100, 1:20) # Apply the ID Row to row.names and 100 for the dummy row from the testing dataset
+```
+
+##Predict with the testing dataset
+```{r}
+predictions <- predict(model,newdata=testing[-1,])
+predictions
+```
+Using the predictions made in this report, we submitted the answers in the quiz with 100% accuracy.
